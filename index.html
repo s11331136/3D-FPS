@@ -37,20 +37,29 @@
         .bar-bg { width: 100%; height: 12px; background: #cbd5e0; border-radius: 3px; margin-top: 6px; overflow: hidden; }
         .bar-fill { height: 100%; background: #0077ff; width: 100%; transition: width 0.1s; }
 
-        .overlay-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(240, 244, 248, 0.92); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; color: #2d3748; }
+        .overlay-screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(240, 244, 248, 0.95); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 10; color: #2d3748; }
         h1 { font-size: 48px; font-weight: 900; color: #0077ff; letter-spacing: 2px; margin-bottom: 5px; }
-        .subtitle { color: #718096; margin-bottom: 30px; font-size: 14px; }
+        .subtitle { color: #718096; margin-bottom: 25px; font-size: 14px; }
+
+        .coin-display { position: absolute; top: 25px; right: 35px; background: #ffffff; border: 2px solid #ecc94b; border-radius: 20px; padding: 8px 18px; font-size: 18px; font-weight: bold; color: #d69e2e; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
 
         .form-group { display: flex; gap: 20px; margin-bottom: 30px; }
         .form-box { background: #ffffff; border: 2px solid #e2e8f0; border-radius: 8px; padding: 18px; width: 220px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .form-box h3 { margin-bottom: 12px; color: #0077ff; font-size: 15px; }
         select { width: 100%; padding: 10px; background: #f7fafc; color: #2d3748; border: 1px solid #cbd5e0; border-radius: 4px; outline: none; cursor: pointer; font-weight: bold; }
 
-        .btn-group { display: flex; gap: 20px; }
-        button.btn { padding: 14px 40px; font-size: 18px; font-weight: bold; color: #ffffff; background: #0077ff; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 14px rgba(0,119,255,0.4); }
+        .btn-group { display: flex; gap: 15px; }
+        button.btn { padding: 14px 36px; font-size: 18px; font-weight: bold; color: #ffffff; background: #0077ff; border: none; border-radius: 6px; cursor: pointer; transition: 0.2s; box-shadow: 0 4px 14px rgba(0,119,255,0.4); }
         button.btn:hover { background: #0056b3; transform: translateY(-2px); }
+        button.btn-secondary { background: #718096; box-shadow: 0 4px 14px rgba(113,128,150,0.4); }
+        button.btn-secondary:hover { background: #4a5568; }
         button.btn-danger { background: #e53e3e; box-shadow: 0 4px 14px rgba(229,62,62,0.4); }
         button.btn-danger:hover { background: #c53030; }
+
+        .wheel-container { position: relative; width: 320px; height: 320px; margin-bottom: 20px; }
+        #wheel-canvas { width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 6px 16px rgba(0,0,0,0.15); border: 4px solid #ffffff; }
+        .wheel-pointer { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 14px solid transparent; border-right: 14px solid transparent; border-top: 24px solid #e53e3e; z-index: 5; }
+        #shop-result { height: 24px; font-weight: bold; color: #0077ff; margin-bottom: 15px; }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
@@ -84,40 +93,65 @@
         </div>
     </div>
 
-    <div id="menu-screen" class="overlay-screen">
+    <div id="main-lobby" class="overlay-screen">
+        <div class="coin-display">💰 金幣: <span class="coin-amount">200</span></div>
         <h1>BRIGHT ARENA 3D</h1>
-        <p class="subtitle">視角切換 & 暫停選單版</p>
+        <p class="subtitle">歡迎來到競技場大廳</p>
+        <div class="btn-group">
+            <button id="to-setup-btn" class="btn">進入戰術整備</button>
+            <button id="to-shop-btn" class="btn btn-secondary">軍火商店 (幸運抽獎)</button>
+        </div>
+    </div>
+
+    <div id="menu-screen" class="overlay-screen" style="display: none;">
+        <div class="coin-display">💰 金幣: <span class="coin-amount">200</span></div>
+        <h1>戰術整備</h1>
+        <p class="subtitle">配置進入競技場的裝備</p>
 
         <div class="form-group">
             <div class="form-box">
                 <h3>遊戲模式</h3>
                 <select id="game-mode-select">
-                    <option value="endless">無盡生存模式 (PVE)</option>
-                    <option value="deathmatch">個人對打混戰 (FFA Bot)</option>
+                    <option value="endless">無盡生存模式 (+20💰/Kill)</option>
+                    <option value="deathmatch">個人對打混戰 (+30💰/Kill)</option>
                 </select>
             </div>
             <div class="form-box">
-                <h3>主武器</h3>
-                <select id="main-weapon-select">
-                    <option value="rifle">突擊步槍 (Automatic)</option>
-                    <option value="sniper">重型狙擊槍 (Semi-Auto)</option>
-                    <option value="shotgun">霰彈槍 (Spread Semi)</option>
-                    <option value="smg">衝鋒槍 (Fast Auto)</option>
-                </select>
+                <h3>主裝備 (已解鎖武器)</h3>
+                <select id="main-weapon-select"></select>
             </div>
             <div class="form-box">
-                <h3>副武器</h3>
+                <h3>副裝備</h3>
                 <select id="sub-weapon-select">
-                    <option value="pistol">戰術手槍 (Semi-Auto)</option>
-                    <option value="knife">微型戰術匕首 (Melee)</option>
+                    <option value="pistol">戰術手槍 (預設)</option>
                 </select>
             </div>
         </div>
 
-        <button id="start-btn" class="btn">進入競技場</button>
+        <div class="btn-group">
+            <button id="start-btn" class="btn">出擊進入戰鬥</button>
+            <button id="back-to-lobby-btn" class="btn btn-secondary">返回大廳</button>
+        </div>
     </div>
 
-    <!-- 暫停視窗 -->
+    <div id="shop-screen" class="overlay-screen" style="display: none;">
+        <div class="coin-display">💰 金幣: <span class="coin-amount">200</span></div>
+        <h1 style="font-size: 36px;">軍火幸運大輪盤</h1>
+        <p class="subtitle" id="shop-subtitle">每次抽獎消耗金幣（每抽一次價格增加 10 金幣）</p>
+
+        <div class="wheel-container">
+            <div class="wheel-pointer"></div>
+            <canvas id="wheel-canvas" width="320" height="320"></canvas>
+        </div>
+
+        <div id="shop-result">準備好試試手氣了嗎？</div>
+
+        <div class="btn-group">
+            <button id="spin-btn" class="btn">開始抽獎 (100 金幣)</button>
+            <button id="shop-back-btn" class="btn btn-secondary">返回大廳</button>
+        </div>
+    </div>
+
     <div id="pause-screen" class="overlay-screen" style="display: none;">
         <h1>遊戲暫停</h1>
         <p class="subtitle">按 ESC 或點擊按鈕恢復戰鬥</p>
@@ -130,7 +164,10 @@
     <div id="gameover-screen" class="overlay-screen" style="display: none;">
         <h1 style="color: #e53e3e;">戰局結束</h1>
         <p class="subtitle" id="gameover-summary">最終戰績記錄</p>
-        <button id="restart-btn" class="btn">重新開局</button>
+        <div class="btn-group">
+            <button id="restart-btn" class="btn">再次開局</button>
+            <button id="over-quit-btn" class="btn btn-secondary">返回主大廳</button>
+        </div>
     </div>
 </div>
 
@@ -143,20 +180,6 @@ class SoundController {
     playShoot(type) {
         if (this.ctx.state === 'suspended') this.ctx.resume();
         const now = this.ctx.currentTime;
-        const osc = this.ctx.createOscillator();
-        const gain = this.ctx.createGain();
-
-        if (type === 'knife') {
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(400, now);
-            osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.linearRampToValueAtTime(0.01, now + 0.1);
-            osc.connect(gain); gain.connect(this.ctx.destination);
-            osc.start(now); osc.stop(now + 0.1);
-            return;
-        }
-
         const dur = type === 'sniper' ? 0.4 : type === 'shotgun' ? 0.25 : 0.12;
         const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * dur, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
@@ -168,6 +191,7 @@ class SoundController {
         filter.type = 'bandpass';
         filter.frequency.value = type === 'sniper' ? 800 : type === 'shotgun' ? 1200 : 2000;
 
+        const gain = this.ctx.createGain();
         gain.gain.setValueAtTime(type === 'bot' ? 0.25 : type === 'sniper' ? 0.6 : 0.4, now);
         gain.gain.exponentialRampToValueAtTime(0.01, now + dur);
 
@@ -191,13 +215,16 @@ class SoundController {
 }
 
 const WEAPON_CONFIGS = {
+    pistol:  { name: '戰術手槍', damage: 32, fireRate: 180, ammoMax: 12, range: 80,  spread: 0.02,  zoomFov: 58, type: 'semi', length: 0.38 },
     rifle:   { name: '突擊步槍', damage: 28, fireRate: 110, ammoMax: 30, range: 140, spread: 0.015, zoomFov: 42, type: 'auto', length: 0.85 },
     sniper:  { name: '狙擊槍',   damage: 110, fireRate: 850, ammoMax: 5,  range: 300, spread: 0.001, zoomFov: 16, type: 'semi', length: 1.2 },
     shotgun: { name: '霰彈槍',   damage: 16, pellets: 8, fireRate: 750, ammoMax: 8, range: 35, spread: 0.08, zoomFov: 60, type: 'semi', length: 0.75 },
-    smg:     { name: '衝鋒槍',   damage: 18, fireRate: 65,  ammoMax: 40, range: 50,  spread: 0.04,  zoomFov: 55, type: 'auto', length: 0.55 },
-    pistol:  { name: '戰術手槍', damage: 32, fireRate: 180, ammoMax: 12, range: 80,  spread: 0.02,  zoomFov: 58, type: 'semi', length: 0.38 },
-    knife:   { name: '戰術匕首', damage: 85, fireRate: 400, ammoMax: Infinity, range: 3.5, melee: true, zoomFov: 68, length: 0.3 }
+    smg:     { name: '衝鋒槍',   damage: 18, fireRate: 65,  ammoMax: 40, range: 50,  spread: 0.04,  zoomFov: 55, type: 'auto', length: 0.55 }
 };
+
+let playerCoins = 200;
+let unlockedWeapons = ['pistol'];
+let spinCost = 100; // 抽獎初始費用
 
 let scene, camera, renderer, soundCtrl;
 let currentMode = 'endless';
@@ -210,7 +237,7 @@ let player = {
     hp: 100, maxHp: 100, speed: 7.5,
     onGround: false, inventory: [], currentSlot: 0,
     isAiming: false, targetFov: 75,
-    kills: 0, lastHitTime: 0
+    kills: 0, earnedCoins: 0, lastHitTime: 0
 };
 
 let playerMesh;
@@ -225,10 +252,27 @@ let weaponModels = [];
 
 const BOT_NAMES = ['AlphaBot', 'BetaBot', 'CyberGuy', 'Shadow', 'Falcon', 'Vortex'];
 
+const WHEEL_ITEMS = [
+    { type: 'weapon', key: 'rifle',   name: '突擊步槍', color: '#3182ce' },
+    { type: 'coin',   amount: 150,    name: '150 金幣', color: '#ecc94b' },
+    { type: 'weapon', key: 'sniper',  name: '重型狙擊槍', color: '#805ad5' },
+    { type: 'coin',   amount: 50,     name: '50 金幣',  color: '#cbd5e0' },
+    { type: 'weapon', key: 'shotgun', name: '霰彈槍',   color: '#dd6b20' },
+    { type: 'coin',   amount: 300,    name: '300 金幣', color: '#d69e2e' },
+    { type: 'weapon', key: 'smg',     name: '衝鋒槍',   color: '#38a169' },
+    { type: 'coin',   amount: 100,    name: '100 金幣', color: '#e2e8f0' }
+];
+let currentWheelAngle = 0;
+let isSpinning = false;
+
 window.addEventListener('DOMContentLoaded', () => {
     soundCtrl = new SoundController();
     initThree();
     setupEventListeners();
+    updateCoinsUI();
+    updateSpinButtonUI();
+    updateWeaponDropdowns();
+    drawWheel();
     animate();
 });
 
@@ -259,6 +303,126 @@ function initThree() {
 
     createPlayerMesh();
     buildMap();
+}
+
+function updateCoinsUI() {
+    document.querySelectorAll('.coin-amount').forEach(el => el.innerText = playerCoins);
+}
+
+function updateSpinButtonUI() {
+    document.getElementById('spin-btn').innerText = `開始抽獎 (${spinCost} 金幣)`;
+}
+
+function updateWeaponDropdowns() {
+    const mainSelect = document.getElementById('main-weapon-select');
+    mainSelect.innerHTML = '';
+    
+    unlockedWeapons.forEach(key => {
+        const option = document.createElement('option');
+        option.value = key;
+        option.innerText = WEAPON_CONFIGS[key].name;
+        mainSelect.appendChild(option);
+    });
+}
+
+function drawWheel() {
+    const canvas = document.getElementById('wheel-canvas');
+    const ctx = canvas.getContext('2d');
+    const num = WHEEL_ITEMS.length;
+    const arc = (Math.PI * 2) / num;
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const radius = cx - 4;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    for (let i = 0; i < num; i++) {
+        const angle = currentWheelAngle + i * arc;
+        ctx.beginPath();
+        ctx.fillStyle = WHEEL_ITEMS[i].color;
+        ctx.moveTo(cx, cy);
+        ctx.arc(cx, cy, radius, angle, angle + arc);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.translate(cx + Math.cos(angle + arc / 2) * (radius * 0.65), cy + Math.sin(angle + arc / 2) * (radius * 0.65));
+        ctx.rotate(angle + arc / 2 + Math.PI / 2);
+        ctx.fillText(WHEEL_ITEMS[i].name, -ctx.measureText(WHEEL_ITEMS[i].name).width / 2, 0);
+        ctx.restore();
+    }
+}
+
+function spinWheel() {
+    if (isSpinning) return;
+    if (playerCoins < spinCost) {
+        document.getElementById('shop-result').innerText = `❌ 金幣不足！需要 ${spinCost} 金幣。`;
+        document.getElementById('shop-result').style.color = '#e53e3e';
+        return;
+    }
+
+    playerCoins -= spinCost;
+    spinCost += 10; // 每次抽獎費用增加 10 金幣
+    updateCoinsUI();
+    updateSpinButtonUI();
+
+    isSpinning = true;
+    document.getElementById('shop-result').innerText = '🎰 轉盤旋轉中...';
+    document.getElementById('shop-result').style.color = '#0077ff';
+
+    const spinAngle = Math.PI * 2 * (5 + Math.random() * 5);
+    const startAngle = currentWheelAngle;
+    const duration = 4000;
+    const startTime = performance.now();
+
+    function animateSpin(now) {
+        const elapsed = now - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        const easeOut = 1 - Math.pow(1 - progress, 3);
+
+        currentWheelAngle = startAngle + spinAngle * easeOut;
+        drawWheel();
+
+        if (progress < 1) {
+            requestAnimationFrame(animateSpin);
+        } else {
+            isSpinning = false;
+            resolveWheelResult();
+        }
+    }
+    requestAnimationFrame(animateSpin);
+}
+
+function resolveWheelResult() {
+    const num = WHEEL_ITEMS.length;
+    const arc = (Math.PI * 2) / num;
+    let normalizedAngle = (3 * Math.PI / 2 - (currentWheelAngle % (Math.PI * 2))) % (Math.PI * 2);
+    if (normalizedAngle < 0) normalizedAngle += Math.PI * 2;
+
+    const selectedIndex = Math.floor(normalizedAngle / arc);
+    const reward = WHEEL_ITEMS[selectedIndex];
+    const resultEl = document.getElementById('shop-result');
+
+    if (reward.type === 'coin') {
+        playerCoins += reward.amount;
+        updateCoinsUI();
+        resultEl.innerText = `🎉 恭喜抽中 ${reward.name}！`;
+        resultEl.style.color = '#d69e2e';
+    } else if (reward.type === 'weapon') {
+        if (!unlockedWeapons.includes(reward.key)) {
+            unlockedWeapons.push(reward.key);
+            updateWeaponDropdowns();
+            resultEl.innerText = `🔥 太棒了！新武器解鎖：【${reward.name}】！`;
+            resultEl.style.color = '#38a169';
+        } else {
+            playerCoins += 100;
+            updateCoinsUI();
+            resultEl.innerText = `恭喜抽中【${reward.name}】(已擁有，返還 100 金幣)`;
+            resultEl.style.color = '#0077ff';
+        }
+    }
 }
 
 function createPlayerMesh() {
@@ -321,28 +485,21 @@ function createWeaponMesh(type) {
     const matDark = new THREE.MeshStandardMaterial({ color: 0x2d3748, roughness: 0.3 });
     const matAccent = new THREE.MeshStandardMaterial({ color: 0x0077ff });
 
-    if (type === 'knife') {
-        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.22, 0.04), new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.8 }));
-        blade.position.set(0, 0.1, -0.1);
-        const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.12), matDark);
-        group.add(blade, handle);
-    } else {
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, config.length), matDark);
-        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, config.length * 0.7), matDark);
-        barrel.rotation.x = Math.PI / 2;
-        barrel.position.set(0, 0.02, -config.length * 0.4);
-        
-        const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.02, config.length * 0.5), matAccent);
-        stripe.position.set(0, 0.04, -0.05);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.1, config.length), matDark);
+    const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, config.length * 0.7), matDark);
+    barrel.rotation.x = Math.PI / 2;
+    barrel.position.set(0, 0.02, -config.length * 0.4);
+    
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.02, config.length * 0.5), matAccent);
+    stripe.position.set(0, 0.04, -0.05);
 
-        group.add(body, barrel, stripe);
+    group.add(body, barrel, stripe);
 
-        if (type === 'sniper') {
-            const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.35), matDark);
-            scope.rotation.x = Math.PI / 2;
-            scope.position.set(0, 0.08, -0.1);
-            group.add(scope);
-        }
+    if (type === 'sniper') {
+        const scope = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.35), matDark);
+        scope.rotation.x = Math.PI / 2;
+        scope.position.set(0, 0.08, -0.1);
+        group.add(scope);
     }
 
     group.position.set(0.18, -0.18, -0.35);
@@ -417,6 +574,29 @@ function spawnBot(name, customAiType = null) {
 }
 
 function setupEventListeners() {
+    document.getElementById('to-setup-btn').addEventListener('click', () => {
+        document.getElementById('main-lobby').style.display = 'none';
+        document.getElementById('menu-screen').style.display = 'flex';
+    });
+    document.getElementById('to-shop-btn').addEventListener('click', () => {
+        document.getElementById('main-lobby').style.display = 'none';
+        document.getElementById('shop-screen').style.display = 'flex';
+    });
+    document.getElementById('back-to-lobby-btn').addEventListener('click', () => {
+        document.getElementById('menu-screen').style.display = 'none';
+        document.getElementById('main-lobby').style.display = 'flex';
+    });
+    document.getElementById('shop-back-btn').addEventListener('click', () => {
+        document.getElementById('shop-screen').style.display = 'none';
+        document.getElementById('main-lobby').style.display = 'flex';
+    });
+    document.getElementById('over-quit-btn').addEventListener('click', () => {
+        document.getElementById('gameover-screen').style.display = 'none';
+        document.getElementById('main-lobby').style.display = 'flex';
+    });
+
+    document.getElementById('spin-btn').addEventListener('click', spinWheel);
+
     document.getElementById('start-btn').addEventListener('click', startGame);
     document.getElementById('restart-btn').addEventListener('click', startGame);
     document.getElementById('resume-btn').addEventListener('click', resumeGame);
@@ -424,7 +604,6 @@ function setupEventListeners() {
 
     window.addEventListener('resize', onWindowResize);
 
-    // ESC 觸發暫停事件監聽
     document.addEventListener('pointerlockchange', () => {
         if (document.pointerLockElement !== document.body && isGameActive) {
             pauseGame();
@@ -499,7 +678,7 @@ function startGame() {
     weaponModels.push(createWeaponMesh(subType));
     scene.add(camera);
 
-    player.hp = 100; player.kills = 0; player.lastHitTime = 0;
+    player.hp = 100; player.kills = 0; player.earnedCoins = 0; player.lastHitTime = 0;
     player.pos.set(0, 1.7, 10);
     player.vel.set(0, 0, 0);
     player.currentSlot = 0;
@@ -507,17 +686,18 @@ function startGame() {
     switchWeapon(0);
 
     if (currentMode === 'endless') {
-        document.getElementById('mode-title').innerText = '無盡生存模式';
+        document.getElementById('mode-title').innerText = '無盡生存 (+20💰/Kill)';
         spawnBot('固定哨兵 Alpha', 'stationary');
         spawnBot('固定哨兵 Beta', 'stationary');
         spawnBot('巡邏 Bot A', 'patrol');
         spawnBot('巡邏 Bot B', 'patrol');
         spawnBot('追擊 Bot X', 'chase');
     } else {
-        document.getElementById('mode-title').innerText = '個人對打混戰 (FFA)';
+        document.getElementById('mode-title').innerText = '個人混戰 (+30💰/Kill)';
         BOT_NAMES.forEach(name => spawnBot(name));
     }
 
+    document.getElementById('main-lobby').style.display = 'none';
     document.getElementById('menu-screen').style.display = 'none';
     document.getElementById('pause-screen').style.display = 'none';
     document.getElementById('gameover-screen').style.display = 'none';
@@ -545,7 +725,8 @@ function quitToMenu() {
     isPaused = false;
     document.getElementById('pause-screen').style.display = 'none';
     document.getElementById('hud').style.display = 'none';
-    document.getElementById('menu-screen').style.display = 'flex';
+    document.getElementById('main-lobby').style.display = 'flex';
+    updateCoinsUI();
 }
 
 function switchWeapon(slotIndex) {
@@ -573,7 +754,7 @@ function toggleAim(enable) {
 
 function reloadWeapon() {
     const curWpn = player.inventory[player.currentSlot];
-    if (curWpn.melee || curWpn.ammo === curWpn.ammoMax) return;
+    if (curWpn.ammo === curWpn.ammoMax) return;
     curWpn.ammo = curWpn.ammoMax;
     updateUI();
 }
@@ -583,10 +764,10 @@ function shoot() {
     const curWpn = player.inventory[player.currentSlot];
 
     if (now - lastShootTime < curWpn.fireRate) return;
-    if (!curWpn.melee && curWpn.ammo <= 0) return;
+    if (curWpn.ammo <= 0) return;
 
     lastShootTime = now;
-    if (!curWpn.melee) curWpn.ammo--;
+    curWpn.ammo--;
     soundCtrl.playShoot(curWpn.type);
     updateUI();
 
@@ -626,7 +807,12 @@ function shoot() {
                 showHitMarker();
 
                 if (hitData.bot.hp <= 0) {
-                    handleKill(player.name, hitData.bot.name, curWpn.name);
+                    // 根據模式賦予擊殺金幣（無盡模式: 20，個人混戰: 30）
+                    const rewardCoins = currentMode === 'endless' ? 20 : 30;
+                    playerCoins += rewardCoins;
+                    player.earnedCoins += rewardCoins;
+
+                    handleKill(player.name, hitData.bot.name, curWpn.name, rewardCoins);
                     player.kills++;
                     scene.remove(hitData.bot.mesh);
                     botEntities = botEntities.filter(b => b !== hitData.bot);
@@ -640,11 +826,12 @@ function shoot() {
     }
 }
 
-function handleKill(killerName, victimName, weaponName) {
+function handleKill(killerName, victimName, weaponName, rewardCoins = 0) {
     const feed = document.getElementById('kill-feed');
     const msg = document.createElement('div');
     msg.className = 'kill-msg';
-    msg.innerHTML = `<span style="color:#0077ff">${killerName}</span> [${weaponName}] <span style="color:#e53e3e">${victimName}</span>`;
+    const rewardTag = rewardCoins > 0 ? ` (+${rewardCoins}💰)` : '';
+    msg.innerHTML = `<span style="color:#0077ff">${killerName}</span> [${weaponName}] <span style="color:#e53e3e">${victimName}</span>${rewardTag}`;
     feed.prepend(msg);
     setTimeout(() => msg.remove(), 4000);
 }
@@ -688,7 +875,6 @@ function updatePlayer(dt) {
         player.pos.y = 1.7; player.vel.y = 0; player.onGround = true;
     }
 
-    // 視角與攝影機位置控制 (1P / 3P 切換)
     if (isThirdPerson) {
         playerMesh.visible = true;
         playerMesh.position.set(player.pos.x, player.pos.y - 1.7, player.pos.z);
@@ -708,7 +894,7 @@ function updatePlayer(dt) {
 
     if (mouseButtons[0]) {
         const curWpn = player.inventory[player.currentSlot];
-        if (curWpn.type === 'auto' || curWpn.melee) shoot();
+        if (curWpn.type === 'auto') shoot();
     }
 }
 
@@ -794,7 +980,7 @@ function updateAI(dt) {
 function updateUI() {
     const curWpn = player.inventory[player.currentSlot];
     document.getElementById('current-weapon-name').innerText = curWpn.name;
-    document.getElementById('ammo-text').innerText = curWpn.melee ? '∞' : `${curWpn.ammo} / ${curWpn.ammoMax}`;
+    document.getElementById('ammo-text').innerText = `${curWpn.ammo} / ${curWpn.ammoMax}`;
     document.getElementById('hp-text').innerText = Math.max(0, Math.floor(player.hp));
     document.getElementById('hp-bar').style.width = `${Math.max(0, player.hp)}%`;
 
@@ -818,8 +1004,9 @@ function gameOver() {
     isGameActive = false;
     document.exitPointerLock();
     document.getElementById('hud').style.display = 'none';
-    document.getElementById('gameover-summary').innerText = `最終擊殺數: ${player.kills}`;
+    document.getElementById('gameover-summary').innerText = `最終擊殺數: ${player.kills} | 本局共獲得金幣: ${player.earnedCoins}💰`;
     document.getElementById('gameover-screen').style.display = 'flex';
+    updateCoinsUI();
 }
 
 function onWindowResize() {
