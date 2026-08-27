@@ -23,6 +23,7 @@
 
         .hud-card { position: absolute; background: rgba(255, 255, 255, 0.88); border: 2px solid #0077ff; border-radius: 6px; padding: 12px 20px; color: #1a202c; font-weight: bold; font-family: monospace; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         #health-hud { bottom: 25px; left: 25px; width: 240px; }
+        #skills-hud { bottom: 25px; left: 280px; width: 200px; }
         #ammo-hud { bottom: 25px; right: 25px; text-align: right; min-width: 180px; }
         #weapon-hud { top: 25px; right: 25px; text-align: right; }
         
@@ -30,6 +31,14 @@
         #leaderboard h4 { color: #0077ff; border-bottom: 2px solid #0077ff; padding-bottom: 4px; margin-bottom: 6px; }
         .lb-row { display: flex; justify-content: space-between; margin-bottom: 3px; color: #4a5568; }
         .lb-row.player { color: #e53e3e; font-weight: bold; }
+
+        #buff-container { position: absolute; top: 80px; left: 25px; display: flex; flex-direction: column; gap: 6px; }
+        .buff-tag { background: rgba(0, 0, 0, 0.75); color: #fff; padding: 6px 12px; border-radius: 4px; font-size: 13px; font-weight: bold; font-family: monospace; border-left: 4px solid #ecc94b; }
+
+        #boss-hud { position: absolute; top: 25px; left: 50%; transform: translateX(-50%); width: 450px; text-align: center; display: none; background: rgba(0,0,0,0.8); border: 2px solid #e53e3e; padding: 10px; border-radius: 8px; color: white; }
+        #boss-warning { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); font-size: 42px; font-weight: 900; color: #e53e3e; text-shadow: 0 0 10px #000; display: none; pointer-events: none; animation: pulse 0.5s infinite alternate; }
+
+        @keyframes pulse { from { opacity: 0.3; transform: translate(-50%, -50%) scale(0.95); } to { opacity: 1; transform: translate(-50%, -50%) scale(1.05); } }
 
         #kill-feed { position: absolute; top: 80px; right: 25px; width: 280px; text-align: right; font-size: 12px; font-family: monospace; }
         .kill-msg { background: rgba(255,255,255,0.95); color: #2d3748; padding: 5px 10px; margin-bottom: 4px; border-right: 4px solid #0077ff; border-radius: 4px; font-weight: bold; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
@@ -75,6 +84,14 @@
             <div id="lb-list"></div>
         </div>
 
+        <div id="buff-container"></div>
+        <div id="boss-warning">⚠️ WARNING: BOSS INCOMING ⚠️</div>
+
+        <div id="boss-hud">
+            <div id="boss-name" style="font-weight: bold; letter-spacing: 1px;">毀滅鋼鐵巨獸</div>
+            <div class="bar-bg"><div id="boss-hp-bar" class="bar-fill" style="background:#e53e3e; width: 100%;"></div></div>
+        </div>
+
         <div id="kill-feed"></div>
 
         <div id="weapon-hud">
@@ -85,6 +102,12 @@
         <div id="health-hud" class="hud-card">
             生命值 <span id="hp-text" style="color: #e53e3e; font-weight: bold;">100</span>
             <div class="bar-bg"><div id="hp-bar" class="bar-fill"></div></div>
+        </div>
+
+        <div id="skills-hud" class="hud-card">
+            <div style="font-size: 12px; color: #718096; margin-bottom: 4px;">戰術技能</div>
+            <div style="font-size: 13px;">[SHIFT] 衝刺: <span id="dash-cd-text" style="color: #38a169;">READY</span></div>
+            <div style="font-size: 13px;">[E] 手榴彈: <span id="grenade-cd-text" style="color: #38a169;">READY</span></div>
         </div>
 
         <div id="ammo-hud" class="hud-card">
@@ -199,6 +222,28 @@ class SoundController {
         noise.start(now);
     }
 
+    playExplosion() {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const now = this.ctx.currentTime;
+        const dur = 0.8;
+        const buffer = this.ctx.createBuffer(1, this.ctx.sampleRate * dur, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 400;
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.8, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + dur);
+
+        noise.connect(filter); filter.connect(gain); gain.connect(this.ctx.destination);
+        noise.start(now);
+    }
+
     playHit() {
         if (this.ctx.state === 'suspended') this.ctx.resume();
         const now = this.ctx.currentTime;
@@ -212,6 +257,20 @@ class SoundController {
         osc.connect(gain); gain.connect(this.ctx.destination);
         osc.start(now); osc.stop(now + 0.05);
     }
+
+    playItemPick() {
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        osc.start(now); osc.stop(now + 0.15);
+    }
 }
 
 const WEAPON_CONFIGS = {
@@ -224,7 +283,7 @@ const WEAPON_CONFIGS = {
 
 let playerCoins = 200;
 let unlockedWeapons = ['pistol'];
-let spinCost = 100; // 抽獎初始費用
+let spinCost = 100;
 
 let scene, camera, renderer, soundCtrl;
 let currentMode = 'endless';
@@ -237,7 +296,14 @@ let player = {
     hp: 100, maxHp: 100, speed: 7.5,
     onGround: false, inventory: [], currentSlot: 0,
     isAiming: false, targetFov: 75,
-    kills: 0, earnedCoins: 0, lastHitTime: 0
+    kills: 0, earnedCoins: 0, lastHitTime: 0,
+    // Skills CD
+    lastDashTime: 0, dashCD: 3000,
+    lastGrenadeTime: 0, grenadeCD: 6000,
+    // Buffs
+    doubleDamageTimer: 0,
+    magnetTimer: 0,
+    teleportCD: 0
 };
 
 let playerMesh;
@@ -249,8 +315,15 @@ let keys = {}, mouseButtons = {};
 let lastShootTime = 0;
 let botEntities = [];
 let weaponModels = [];
+let grenades = [];
+let dropItems = [];
+let explosiveBarrels = [];
+let jumpPads = [];
+let teleporters = [];
+let activeBoss = null;
+let killsSinceBoss = 0;
 
-const BOT_NAMES = ['AlphaBot', 'BetaBot', 'CyberGuy', 'Shadow', 'Falcon', 'Vortex'];
+const BOT_NAMES = ['AlphaBot', 'BetaBot', 'CyberGuy', 'Shadow', 'Falcon', 'Vortex', 'Reaper', 'Titan'];
 
 const WHEEL_ITEMS = [
     { type: 'weapon', key: 'rifle',   name: '突擊步槍', color: '#3182ce' },
@@ -364,7 +437,7 @@ function spinWheel() {
     }
 
     playerCoins -= spinCost;
-    spinCost += 10; // 每次抽獎費用增加 10 金幣
+    spinCost += 10;
     updateCoinsUI();
     updateSpinButtonUI();
 
@@ -477,6 +550,56 @@ function buildMap() {
         mesh.receiveShadow = true;
         scene.add(mesh);
     });
+
+    // 建立炸藥桶 (Explosive Barrels)
+    const barrelPosList = [
+        { x: -5, z: -10 }, { x: 5, z: -10 }, { x: -10, z: 5 }, { x: 10, z: 5 }
+    ];
+    barrelPosList.forEach(pos => createExplosiveBarrel(pos.x, pos.z));
+
+    // 建立彈跳平台 (Jump Pads)
+    createJumpPad(-12, -5);
+    createJumpPad(12, -5);
+
+    // 建立傳送門 (Teleporters)
+    createTeleporterPair(new THREE.Vector3(-25, 0.1, -25), new THREE.Vector3(25, 0.1, 25));
+}
+
+function createExplosiveBarrel(x, z) {
+    const geo = new THREE.CylinderGeometry(0.5, 0.5, 1.4, 16);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xe53e3e, roughness: 0.3, metalness: 0.2 });
+    const barrel = new THREE.Mesh(geo, mat);
+    barrel.position.set(x, 0.7, z);
+    barrel.castShadow = true;
+    barrel.receiveShadow = true;
+    barrel.userData = { hp: 30, isBarrel: true };
+    scene.add(barrel);
+    explosiveBarrels.push(barrel);
+}
+
+function createJumpPad(x, z) {
+    const geo = new THREE.CylinderGeometry(1.2, 1.4, 0.15, 16);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x38a169, emissive: 0x22543d, roughness: 0.2 });
+    const pad = new THREE.Mesh(geo, mat);
+    pad.position.set(x, 0.08, z);
+    scene.add(pad);
+    jumpPads.push(pad);
+}
+
+function createTeleporterPair(posA, posB) {
+    const geo = new THREE.TorusGeometry(1.0, 0.12, 16, 32);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x805ad5 });
+
+    const portalA = new THREE.Mesh(geo, mat);
+    portalA.rotation.x = Math.PI / 2;
+    portalA.position.copy(posA);
+
+    const portalB = new THREE.Mesh(geo, mat);
+    portalB.rotation.x = Math.PI / 2;
+    portalB.position.copy(posB);
+
+    scene.add(portalA); scene.add(portalB);
+    teleporters.push({ a: portalA, b: portalB });
 }
 
 function createWeaponMesh(type) {
@@ -508,12 +631,24 @@ function createWeaponMesh(type) {
     return group;
 }
 
-function createBotMesh() {
+function createBotMesh(type = 'normal') {
     const group = new THREE.Group();
-    const matBody = new THREE.MeshStandardMaterial({ color: 0x4a5568, roughness: 0.4 });
-    const matHead = new THREE.MeshStandardMaterial({ color: 0x319795 });
+    let matColor = 0x4a5568;
+    let headColor = 0x319795;
+    let isStealth = false;
+
+    if (type === 'suicide') { matColor = 0xdd6b20; headColor = 0xe53e3e; }
+    else if (type === 'shield') { matColor = 0x2b6cb0; headColor = 0x3182ce; }
+    else if (type === 'stealth') { matColor = 0x718096; headColor = 0xa0aec0; isStealth = true; }
+    else if (type === 'boss') { matColor = 0x742a2a; headColor = 0x9b2c2c; }
+
+    const matBody = new THREE.MeshStandardMaterial({ color: matColor, roughness: 0.4, transparent: isStealth, opacity: isStealth ? 0.25 : 1.0 });
+    const matHead = new THREE.MeshStandardMaterial({ color: headColor, transparent: isStealth, opacity: isStealth ? 0.25 : 1.0 });
     const matGun = new THREE.MeshStandardMaterial({ color: 0x1a202c, roughness: 0.2, metalness: 0.8 });
     const matRedDetail = new THREE.MeshBasicMaterial({ color: 0xff0044 });
+
+    const scale = type === 'boss' ? 2.5 : 1.0;
+    group.scale.set(scale, scale, scale);
 
     const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.2, 1.1), matBody);
     torso.position.y = 0.85; torso.castShadow = true;
@@ -533,24 +668,28 @@ function createBotMesh() {
     gunGroup.add(gunBody, barrel, laserSight);
     gunGroup.position.set(0.28, 0.9, -0.25);
 
+    let shieldMesh = null;
+    if (type === 'shield') {
+        const shieldMat = new THREE.MeshStandardMaterial({ color: 0x1a202c, metalness: 0.8, roughness: 0.2 });
+        shieldMesh = new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.4, 0.1), shieldMat);
+        shieldMesh.position.set(0, 0.85, -0.45);
+        shieldMesh.name = "shield";
+        group.add(shieldMesh);
+    }
+
     group.add(torso, head, gunGroup);
-    return { group, head, gunGroup };
+    return { group, head, gunGroup, shieldMesh, matBody, matHead };
 }
 
-function createLaserTracer(fromPos, toPos) {
-    const mat = new THREE.LineBasicMaterial({ color: 0xff0044, linewidth: 2 });
-    const points = [fromPos, toPos];
-    const geo = new THREE.BufferGeometry().setFromPoints(points);
-    const line = new THREE.Line(geo, mat);
-    scene.add(line);
-    setTimeout(() => scene.remove(line), 90);
-}
+function spawnBot(name, customType = null) {
+    const types = ['normal', 'suicide', 'shield', 'stealth'];
+    const type = customType || types[Math.floor(Math.random() * types.length)];
+    const botData = createBotMesh(type);
 
-function spawnBot(name, customAiType = null) {
-    const botData = createBotMesh();
-    const aiTypes = ['stationary', 'patrol', 'chase'];
-    const aiType = customAiType || aiTypes[Math.floor(Math.random() * aiTypes.length)];
-    const speed = aiType === 'chase' ? 1.8 : aiType === 'patrol' ? 1.0 : 0;
+    let hp = 100, speed = 1.5;
+    if (type === 'suicide') { hp = 45; speed = 3.5; }
+    if (type === 'shield') { hp = 160; speed = 1.0; }
+    if (type === 'stealth') { hp = 80; speed = 2.2; }
 
     const angle = Math.random() * Math.PI * 2;
     const dist = 14 + Math.random() * 20;
@@ -560,17 +699,67 @@ function spawnBot(name, customAiType = null) {
 
     botEntities.push({
         name: name,
+        type: type,
         mesh: botData.group,
         headMesh: botData.head,
+        shieldMesh: botData.shieldMesh,
+        matBody: botData.matBody,
+        matHead: botData.matHead,
         gunGroup: botData.gunGroup,
-        hp: 100,
-        aiType: aiType,
+        hp: hp,
+        maxHp: hp,
         speed: speed,
         patrolTarget: new THREE.Vector3((Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40),
         lastAttack: 0,
         targetEntity: null,
         kills: 0
     });
+}
+
+function spawnBoss() {
+    if (activeBoss) return;
+    const botData = createBotMesh('boss');
+    botData.group.position.set(0, 0, -30);
+
+    const warnEl = document.getElementById('boss-warning');
+    warnEl.style.display = 'block';
+    setTimeout(() => warnEl.style.display = 'none', 2500);
+
+    document.getElementById('boss-hud').style.display = 'block';
+
+    scene.add(botData.group);
+
+    activeBoss = {
+        name: '巨型毀滅者 (BOSS)',
+        type: 'boss',
+        mesh: botData.group,
+        headMesh: botData.head,
+        gunGroup: botData.gunGroup,
+        hp: 1200,
+        maxHp: 1200,
+        speed: 1.2,
+        lastAttack: 0,
+        kills: 0
+    };
+
+    botEntities.push(activeBoss);
+}
+
+function spawnDropItem(pos) {
+    const itemTypes = ['health', 'damage', 'magnet'];
+    const type = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+    
+    let color = 0x38a169;
+    if (type === 'damage') color = 0xe53e3e;
+    if (type === 'magnet') color = 0xd69e2e;
+
+    const geo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+    const mat = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: 0.4 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.copy(pos).add(new THREE.Vector3(0, 0.3, 0));
+
+    scene.add(mesh);
+    dropItems.push({ mesh: mesh, type: type });
 }
 
 function setupEventListeners() {
@@ -631,6 +820,8 @@ function setupEventListeners() {
         if (e.code === 'KeyR') reloadWeapon();
         if (e.code === 'Digit1') switchWeapon(0);
         if (e.code === 'Digit2') switchWeapon(1);
+        if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') triggerDash();
+        if (e.code === 'KeyE') throwGrenade();
     });
     
     document.addEventListener('keyup', (e) => { keys[e.code] = false; });
@@ -659,6 +850,110 @@ function setupEventListeners() {
     document.addEventListener('contextmenu', e => e.preventDefault());
 }
 
+function triggerDash() {
+    const now = performance.now();
+    if (now - player.lastDashTime < player.dashCD) return;
+
+    player.lastDashTime = now;
+    const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, player.rotation.y, 0, 'YXZ'));
+    player.pos.addScaledVector(forward, 6.0);
+}
+
+function throwGrenade() {
+    const now = performance.now();
+    if (now - player.lastGrenadeTime < player.grenadeCD) return;
+
+    player.lastGrenadeTime = now;
+    
+    const geo = new THREE.SphereGeometry(0.18, 12, 12);
+    const mat = new THREE.MeshStandardMaterial({ color: 0x22543d, roughness: 0.2 });
+    const mesh = new THREE.Mesh(geo, mat);
+    
+    const spawnPos = camera.position.clone().add(new THREE.Vector3(0, -0.2, -0.5).applyEuler(camera.rotation));
+    mesh.position.copy(spawnPos);
+    
+    const dir = new THREE.Vector3(0, 0, -1).applyEuler(camera.rotation).normalize();
+    const vel = dir.multiplyScalar(18).add(new THREE.Vector3(0, 4, 0));
+
+    scene.add(mesh);
+    grenades.push({ mesh: mesh, vel: vel, spawnTime: now });
+}
+
+function explodeAt(pos, radius, maxDamage) {
+    soundCtrl.playExplosion();
+
+    // 爆破視覺效果
+    const geo = new THREE.SphereGeometry(radius * 0.8, 16, 16);
+    const mat = new THREE.MeshBasicMaterial({ color: 0xff4500, transparent: true, opacity: 0.8 });
+    const expMesh = new THREE.Mesh(geo, mat);
+    expMesh.position.copy(pos);
+    scene.add(expMesh);
+    setTimeout(() => scene.remove(expMesh), 200);
+
+    // 對玩家造傷
+    const distPlayer = pos.distanceTo(player.pos);
+    if (distPlayer < radius) {
+        const dmg = Math.floor((1 - distPlayer / radius) * maxDamage);
+        player.hp -= dmg;
+        updateUI();
+        if (player.hp <= 0) gameOver();
+    }
+
+    // 對敵兵造傷
+    botEntities.forEach(bot => {
+        const dist = pos.distanceTo(bot.mesh.position);
+        if (dist < radius) {
+            const dmg = Math.floor((1 - dist / radius) * maxDamage);
+            bot.hp -= dmg;
+            if (bot.hp <= 0) {
+                killBotProcess(bot, '爆炸衝擊');
+            }
+        }
+    });
+
+    // 對油桶連鎖反應
+    explosiveBarrels.forEach(barrel => {
+        if (barrel.userData.hp > 0 && barrel.position.distanceTo(pos) < radius) {
+            barrel.userData.hp = 0;
+            explodeAt(barrel.position, 6.0, 90);
+            scene.remove(barrel);
+        }
+    });
+}
+
+function killBotProcess(bot, weaponName) {
+    const rewardCoins = currentMode === 'endless' ? 20 : 30;
+    playerCoins += rewardCoins;
+    player.earnedCoins += rewardCoins;
+
+    handleKill(player.name, bot.name, weaponName, rewardCoins);
+    player.kills++;
+    killsSinceBoss++;
+
+    // 機率掉落寶物
+    if (Math.random() < 0.45) {
+        spawnDropItem(bot.mesh.position);
+    }
+
+    scene.remove(bot.mesh);
+    botEntities = botEntities.filter(b => b !== bot);
+
+    if (bot === activeBoss) {
+        activeBoss = null;
+        document.getElementById('boss-hud').style.display = 'none';
+    } else if (currentMode === 'endless') {
+        setTimeout(() => spawnBot('支援 Bot'), 3000);
+    }
+
+    // 無盡模式每 10 Kills 召喚 BOSS
+    if (currentMode === 'endless' && killsSinceBoss >= 10 && !activeBoss) {
+        killsSinceBoss = 0;
+        spawnBoss();
+    }
+
+    updateUI();
+}
+
 function startGame() {
     currentMode = document.getElementById('game-mode-select').value;
     const mainType = document.getElementById('main-weapon-select').value;
@@ -666,8 +961,15 @@ function startGame() {
 
     weaponModels.forEach(m => camera.remove(m));
     botEntities.forEach(b => scene.remove(b.mesh));
+    grenades.forEach(g => scene.remove(g.mesh));
+    dropItems.forEach(d => scene.remove(d.mesh));
+
     botEntities = [];
     weaponModels = [];
+    grenades = [];
+    dropItems = [];
+    activeBoss = null;
+    killsSinceBoss = 0;
 
     player.inventory = [
         { type: mainType, ...WEAPON_CONFIGS[mainType], ammo: WEAPON_CONFIGS[mainType].ammoMax },
@@ -679,6 +981,7 @@ function startGame() {
     scene.add(camera);
 
     player.hp = 100; player.kills = 0; player.earnedCoins = 0; player.lastHitTime = 0;
+    player.doubleDamageTimer = 0; player.magnetTimer = 0;
     player.pos.set(0, 1.7, 10);
     player.vel.set(0, 0, 0);
     player.currentSlot = 0;
@@ -687,11 +990,10 @@ function startGame() {
 
     if (currentMode === 'endless') {
         document.getElementById('mode-title').innerText = '無盡生存 (+20💰/Kill)';
-        spawnBot('固定哨兵 Alpha', 'stationary');
-        spawnBot('固定哨兵 Beta', 'stationary');
-        spawnBot('巡邏 Bot A', 'patrol');
-        spawnBot('巡邏 Bot B', 'patrol');
-        spawnBot('追擊 Bot X', 'chase');
+        spawnBot('固定哨兵 Alpha', 'normal');
+        spawnBot('自殺突擊兵', 'suicide');
+        spawnBot('重防衛兵', 'shield');
+        spawnBot('幽靈刺客', 'stealth');
     } else {
         document.getElementById('mode-title').innerText = '個人混戰 (+30💰/Kill)';
         BOT_NAMES.forEach(name => spawnBot(name));
@@ -701,6 +1003,7 @@ function startGame() {
     document.getElementById('menu-screen').style.display = 'none';
     document.getElementById('pause-screen').style.display = 'none';
     document.getElementById('gameover-screen').style.display = 'none';
+    document.getElementById('boss-hud').style.display = 'none';
     document.getElementById('hud').style.display = 'block';
 
     isGameActive = true;
@@ -776,6 +1079,7 @@ function shoot() {
     setTimeout(() => model.position.z -= 0.06, 40);
 
     const pelletCount = curWpn.pellets || 1;
+    const baseDamage = player.doubleDamageTimer > 0 ? curWpn.damage * 2.0 : curWpn.damage;
 
     for (let i = 0; i < pelletCount; i++) {
         const raycaster = new THREE.Raycaster();
@@ -788,38 +1092,44 @@ function shoot() {
 
         raycaster.set(camera.position, rayDir);
 
-        const targetMeshes = [];
+        const targetObjects = [];
         botEntities.forEach(b => {
-            b.mesh.traverse(child => { if (child.isMesh) targetMeshes.push({ mesh: child, bot: b }); });
+            b.mesh.traverse(child => { if (child.isMesh) targetObjects.push({ mesh: child, bot: b }); });
+        });
+        explosiveBarrels.forEach(barrel => {
+            if (barrel.userData.hp > 0) targetObjects.push({ mesh: barrel, isBarrel: true });
         });
 
-        const intersects = raycaster.intersectObjects(targetMeshes.map(t => t.mesh));
+        const intersects = raycaster.intersectObjects(targetObjects.map(t => t.mesh));
 
         if (intersects.length > 0 && intersects[0].distance <= curWpn.range) {
             const hitObj = intersects[0];
-            const hitData = targetMeshes.find(t => t.mesh === hitObj.object);
+            const hitData = targetObjects.find(t => t.mesh === hitObj.object);
 
             if (hitData) {
-                const isHead = hitObj.object.name === 'head';
-                const dmg = isHead ? curWpn.damage * 2.2 : curWpn.damage;
-                hitData.bot.hp -= dmg;
-                soundCtrl.playHit();
-                showHitMarker();
+                if (hitData.isBarrel) {
+                    hitObj.object.userData.hp -= baseDamage;
+                    if (hitObj.object.userData.hp <= 0) {
+                        explodeAt(hitObj.object.position, 6.0, 90);
+                        scene.remove(hitObj.object);
+                    }
+                } else if (hitData.bot) {
+                    const isShield = hitObj.object.name === 'shield';
+                    if (isShield) {
+                        soundCtrl.playHit();
+                        continue; // 盾牌擋下攻擊
+                    }
 
-                if (hitData.bot.hp <= 0) {
-                    // 根據模式賦予擊殺金幣（無盡模式: 20，個人混戰: 30）
-                    const rewardCoins = currentMode === 'endless' ? 20 : 30;
-                    playerCoins += rewardCoins;
-                    player.earnedCoins += rewardCoins;
+                    const isHead = hitObj.object.name === 'head';
+                    const dmg = isHead ? baseDamage * 2.2 : baseDamage;
+                    hitData.bot.hp -= dmg;
+                    soundCtrl.playHit();
+                    showHitMarker();
 
-                    handleKill(player.name, hitData.bot.name, curWpn.name, rewardCoins);
-                    player.kills++;
-                    scene.remove(hitData.bot.mesh);
-                    botEntities = botEntities.filter(b => b !== hitData.bot);
-
-                    setTimeout(() => spawnBot(currentMode === 'endless' ? '支援 Bot' : hitData.bot.name), 3000);
-                    updateUI();
-                    break;
+                    if (hitData.bot.hp <= 0) {
+                        killBotProcess(hitData.bot, curWpn.name);
+                        break;
+                    }
                 }
             }
         }
@@ -875,6 +1185,29 @@ function updatePlayer(dt) {
         player.pos.y = 1.7; player.vel.y = 0; player.onGround = true;
     }
 
+    // 彈跳平台檢測
+    jumpPads.forEach(pad => {
+        if (Math.hypot(player.pos.x - pad.position.x, player.pos.z - pad.position.z) < 1.2 && player.pos.y <= 1.8) {
+            player.vel.y = 17.5;
+            player.onGround = false;
+        }
+    });
+
+    // 傳送門檢測
+    if (player.teleportCD <= 0) {
+        teleporters.forEach(pair => {
+            if (player.pos.distanceTo(pair.a.position) < 1.4) {
+                player.pos.copy(pair.b.position).add(new THREE.Vector3(0, 1.7, 0));
+                player.teleportCD = 2.0;
+            } else if (player.pos.distanceTo(pair.b.position) < 1.4) {
+                player.pos.copy(pair.a.position).add(new THREE.Vector3(0, 1.7, 0));
+                player.teleportCD = 2.0;
+            }
+        });
+    } else {
+        player.teleportCD -= dt;
+    }
+
     if (isThirdPerson) {
         playerMesh.visible = true;
         playerMesh.position.set(player.pos.x, player.pos.y - 1.7, player.pos.z);
@@ -898,6 +1231,55 @@ function updatePlayer(dt) {
     }
 }
 
+function updateGrenades(dt) {
+    const now = performance.now();
+    for (let i = grenades.length - 1; i >= 0; i--) {
+        const g = grenades[i];
+        g.vel.y -= 18 * dt;
+        g.mesh.position.addScaledVector(g.vel, dt);
+
+        if (g.mesh.position.y <= 0.18) {
+            g.mesh.position.y = 0.18;
+            g.vel.set(0, 0, 0);
+        }
+
+        if (now - g.spawnTime > 2000) {
+            explodeAt(g.mesh.position, 6.5, 120);
+            scene.remove(g.mesh);
+            grenades.splice(i, 1);
+        }
+    }
+}
+
+function updateDropItems(dt) {
+    for (let i = dropItems.length - 1; i >= 0; i--) {
+        const item = dropItems[i];
+        item.mesh.rotation.y += 1.5 * dt;
+
+        // 磁鐵吸附效果
+        if (player.magnetTimer > 0 || item.mesh.position.distanceTo(player.pos) < 2.5) {
+            item.mesh.position.lerp(player.pos, 6.0 * dt);
+        }
+
+        if (item.mesh.position.distanceTo(player.pos) < 1.2) {
+            soundCtrl.playItemPick();
+            if (item.type === 'health') {
+                player.hp = Math.min(100, player.hp + 35);
+            } else if (item.type === 'damage') {
+                player.doubleDamageTimer = 10.0;
+            } else if (item.type === 'magnet') {
+                player.magnetTimer = 8.0;
+            }
+            scene.remove(item.mesh);
+            dropItems.splice(i, 1);
+            updateUI();
+        }
+    }
+
+    if (player.doubleDamageTimer > 0) player.doubleDamageTimer -= dt;
+    if (player.magnetTimer > 0) player.magnetTimer -= dt;
+}
+
 function updateAI(dt) {
     if (!isGameActive || isPaused) return;
     const now = performance.now();
@@ -906,75 +1288,63 @@ function updateAI(dt) {
         let targetPos = player.pos.clone();
         let minDist = bot.mesh.position.distanceTo(player.pos);
 
-        if (currentMode === 'deathmatch') {
-            botEntities.forEach(otherBot => {
-                if (otherBot !== bot) {
-                    const d = bot.mesh.position.distanceTo(otherBot.mesh.position);
-                    if (d < minDist) { minDist = d; targetPos = otherBot.mesh.position.clone(); bot.targetEntity = otherBot; }
-                }
-            });
-            if (minDist === bot.mesh.position.distanceTo(player.pos)) bot.targetEntity = 'player';
+        // 隱身刺客近距離露形
+        if (bot.type === 'stealth') {
+            const isVisible = minDist < 7.0;
+            bot.matBody.opacity = isVisible ? 0.95 : 0.2;
+            bot.matHead.opacity = isVisible ? 0.95 : 0.2;
         }
 
         const bPos = bot.mesh.position;
+        const dir = new THREE.Vector3().subVectors(targetPos, bPos); dir.y = 0; dir.normalize();
 
-        if (bot.aiType === 'chase') {
-            if (minDist > 2.5) {
-                const dir = new THREE.Vector3().subVectors(targetPos, bPos); dir.y = 0; dir.normalize();
-                bPos.addScaledVector(dir, bot.speed * dt);
-                bot.mesh.lookAt(targetPos.x, bPos.y, targetPos.z);
-            }
-        } else if (bot.aiType === 'patrol') {
-            const pDist = bPos.distanceTo(bot.patrolTarget);
-            if (pDist < 2.0) {
-                bot.patrolTarget.set((Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40);
-            } else {
-                const dir = new THREE.Vector3().subVectors(bot.patrolTarget, bPos); dir.y = 0; dir.normalize();
-                bPos.addScaledVector(dir, bot.speed * dt);
-                bot.mesh.lookAt(bot.patrolTarget.x, bPos.y, bot.patrolTarget.z);
-            }
-        } else if (bot.aiType === 'stationary') {
+        if (bot.type === 'suicide') {
+            bPos.addScaledVector(dir, bot.speed * dt);
             bot.mesh.lookAt(targetPos.x, bPos.y, targetPos.z);
-        }
-
-        if (minDist < 18.0) {
-            if (now - bot.lastAttack > 2200) {
+            if (minDist < 2.0) {
+                explodeAt(bPos, 5.0, 75);
+                killBotProcess(bot, '自爆');
+                return;
+            }
+        } else if (bot.type === 'boss') {
+            if (minDist > 5.0) bPos.addScaledVector(dir, bot.speed * dt);
+            bot.mesh.lookAt(targetPos.x, bPos.y, targetPos.z);
+            
+            // Boss 範圍衝擊波
+            if (now - bot.lastAttack > 3500) {
                 bot.lastAttack = now;
-                
+                explodeAt(bPos, 8.0, 40);
+            }
+        } else {
+            if (minDist > 3.0) bPos.addScaledVector(dir, bot.speed * dt);
+            bot.mesh.lookAt(targetPos.x, bPos.y, targetPos.z);
+
+            if (minDist < 20.0 && now - bot.lastAttack > 2200) {
+                bot.lastAttack = now;
                 const muzzlePos = new THREE.Vector3();
                 bot.gunGroup.getWorldPosition(muzzlePos);
-
-                bot.gunGroup.position.z += 0.08;
-                setTimeout(() => bot.gunGroup.position.z -= 0.08, 60);
 
                 soundCtrl.playShoot('bot');
                 createLaserTracer(muzzlePos, targetPos.clone().add(new THREE.Vector3(0, -0.2, 0)));
 
-                if (bot.targetEntity === 'player' || currentMode === 'endless') {
-                    if (Math.random() < 0.6) {
-                        if (now - player.lastHitTime > 400) {
-                            player.hp -= 4;
-                            player.lastHitTime = now;
-                            updateUI();
-                            if (player.hp <= 0) gameOver();
-                        }
-                    }
-                } 
-                else if (bot.targetEntity && bot.targetEntity.hp) {
-                    bot.targetEntity.hp -= 12;
-                    if (bot.targetEntity.hp <= 0) {
-                        handleKill(bot.name, bot.targetEntity.name, '脈衝步槍');
-                        bot.kills++;
-                        scene.remove(bot.targetEntity.mesh);
-                        const deadBot = bot.targetEntity;
-                        botEntities = botEntities.filter(b => b !== deadBot);
-                        setTimeout(() => spawnBot(deadBot.name), 3500);
-                        updateUI();
-                    }
+                if (Math.random() < 0.55 && now - player.lastHitTime > 400) {
+                    player.hp -= 5;
+                    player.lastHitTime = now;
+                    updateUI();
+                    if (player.hp <= 0) gameOver();
                 }
             }
         }
     });
+}
+
+function createLaserTracer(fromPos, toPos) {
+    const mat = new THREE.LineBasicMaterial({ color: 0xff0044, linewidth: 2 });
+    const points = [fromPos, toPos];
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const line = new THREE.Line(geo, mat);
+    scene.add(line);
+    setTimeout(() => scene.remove(line), 90);
 }
 
 function updateUI() {
@@ -984,9 +1354,34 @@ function updateUI() {
     document.getElementById('hp-text').innerText = Math.max(0, Math.floor(player.hp));
     document.getElementById('hp-bar').style.width = `${Math.max(0, player.hp)}%`;
 
+    const now = performance.now();
+    const dashLeft = Math.max(0, ((player.dashCD - (now - player.lastDashTime)) / 1000)).toFixed(1);
+    const grenadeLeft = Math.max(0, ((player.grenadeCD - (now - player.lastGrenadeTime)) / 1000)).toFixed(1);
+
+    document.getElementById('dash-cd-text').innerText = dashLeft <= 0 ? 'READY' : `${dashLeft}s`;
+    document.getElementById('dash-cd-text').style.color = dashLeft <= 0 ? '#38a169' : '#e53e3e';
+
+    document.getElementById('grenade-cd-text').innerText = grenadeLeft <= 0 ? 'READY' : `${grenadeLeft}s`;
+    document.getElementById('grenade-cd-text').style.color = grenadeLeft <= 0 ? '#38a169' : '#e53e3e';
+
+    // Buff 標籤顯示
+    const buffContainer = document.getElementById('buff-container');
+    buffContainer.innerHTML = '';
+    if (player.doubleDamageTimer > 0) {
+        buffContainer.innerHTML += `<div class="buff-tag">🔥 雙倍傷害中 (${player.doubleDamageTimer.toFixed(1)}s)</div>`;
+    }
+    if (player.magnetTimer > 0) {
+        buffContainer.innerHTML += `<div class="buff-tag">🧲 金幣/寶物磁吸中 (${player.magnetTimer.toFixed(1)}s)</div>`;
+    }
+
+    if (activeBoss) {
+        const bossHpBar = document.getElementById('boss-hp-bar');
+        const pct = Math.max(0, (activeBoss.hp / activeBoss.maxHp) * 100);
+        bossHpBar.style.width = `${pct}%`;
+    }
+
     const lbList = document.getElementById('lb-list');
     lbList.innerHTML = '';
-
     const allParticipants = [
         { name: player.name, kills: player.kills, isPlayer: true },
         ...botEntities.map(b => ({ name: b.name, kills: b.kills, isPlayer: false }))
@@ -1025,7 +1420,10 @@ function animate() {
 
     if (isGameActive && !isPaused) {
         updatePlayer(dt);
+        updateGrenades(dt);
+        updateDropItems(dt);
         updateAI(dt);
+        updateUI();
     }
 
     renderer.render(scene, camera);
