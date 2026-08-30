@@ -69,6 +69,56 @@
         #wheel-canvas { width: 100%; height: 100%; border-radius: 50%; box-shadow: 0 6px 16px rgba(0,0,0,0.15); border: 4px solid #ffffff; }
         .wheel-pointer { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); width: 0; height: 0; border-left: 14px solid transparent; border-right: 14px solid transparent; border-top: 24px solid #e53e3e; z-index: 5; }
         #shop-result { height: 24px; font-weight: bold; color: #0077ff; margin-bottom: 15px; }
+        /* 將大廳按鈕組改為垂直縱向排列 */
+        #main-lobby .btn-group {
+            flex-direction: column;
+            width: 100%;
+            max-width: 280px;
+            gap: 12px;
+        }
+        
+        #main-lobby .btn-group button.btn {
+            width: 100%;
+            text-align: center;
+        }
+        
+        /* 自定義房間分頁與輸入框樣式 */
+        .room-tab-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .room-tab-btn {
+            padding: 10px 24px;
+            background: #cbd5e0;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #2d3748;
+            transition: 0.2s;
+        }
+        
+        .room-tab-btn.active {
+            background: #0077ff;
+            color: #ffffff;
+        }
+        
+        .custom-input {
+            width: 100%;
+            padding: 12px;
+            margin-top: 8px;
+            border: 2px solid #cbd5e0;
+            border-radius: 6px;
+            font-size: 15px;
+            text-align: center;
+            outline: none;
+        }
+        
+        .custom-input:focus {
+            border-color: #0077ff;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
@@ -118,12 +168,14 @@
     </div>
 
     <!-- 主大廳 -->
+    <!-- 主大廳 -->
     <div id="main-lobby" class="overlay-screen">
         <div class="coin-display">💰 金幣: <span class="coin-amount">200</span></div>
         <h1>BRIGHT ARENA 3D</h1>
         <p class="subtitle">歡迎來到戰術軍火競技場</p>
         <div class="btn-group">
             <button id="to-setup-btn" class="btn">出擊 / 戰術整備</button>
+            <button id="to-custom-btn" class="btn btn-secondary">自定義房間 (1V1)</button>
             <button id="to-workshop-btn" class="btn btn-secondary">武器配件改裝廠</button>
             <button id="to-shop-btn" class="btn btn-secondary">軍火幸運轉盤</button>
         </div>
@@ -160,7 +212,59 @@
             <button id="back-to-lobby-btn" class="btn btn-secondary">返回大廳</button>
         </div>
     </div>
-
+    
+    <!-- 自定義房間選單 -->
+    <div id="custom-room-screen" class="overlay-screen" style="display: none;">
+        <h1>自定義對決大廳</h1>
+        <p class="subtitle">創建或加入 1V1 專屬密碼房間</p>
+    
+        <div class="room-tab-group">
+            <button id="tab-create-btn" class="room-tab-btn active">創建房間</button>
+            <button id="tab-join-btn" class="room-tab-btn">加入房間</button>
+        </div>
+    
+        <!-- 創建房間區塊 -->
+        <div id="create-room-box" class="form-box" style="width: 300px; margin-bottom: 20px;">
+            <h3>設置房間密碼</h3>
+            <input type="password" id="create-password-input" class="custom-input" placeholder="請設定密碼 (可留空)" maxlength="12">
+        </div>
+    
+        <!-- 加入房間區塊 (預設隱藏) -->
+        <div id="join-room-box" class="form-box" style="width: 300px; margin-bottom: 20px; display: none;">
+            <h3>輸入房間密碼</h3>
+            <input type="password" id="join-password-input" class="custom-input" placeholder="請輸入對手房間密碼" maxlength="12">
+        </div>
+    
+        <div id="room-status-msg" style="height: 20px; color: #e53e3e; font-weight: bold; margin-bottom: 15px;"></div>
+    
+        <div class="btn-group">
+            <button id="confirm-room-btn" class="btn">進入戰術整備</button>
+            <button id="custom-back-btn" class="btn btn-secondary">返回大廳</button>
+        </div>
+    </div>
+    
+    <!-- 自定義房間 - 1V1 戰術整備畫面 -->
+    <div id="custom-prep-screen" class="overlay-screen" style="display: none;">
+        <h1>1V1 戰術對決整備</h1>
+        <p class="subtitle">公平競技模式：可選取全武器（僅提供基礎初始階段）</p>
+    
+        <div class="form-group">
+            <div class="form-box">
+                <h3>主武器選取</h3>
+                <select id="custom-main-weapon"></select>
+            </div>
+            <div class="form-box">
+                <h3>副武器選取</h3>
+                <select id="custom-sub-weapon"></select>
+            </div>
+        </div>
+    
+        <div class="btn-group">
+            <button id="start-1v1-btn" class="btn">進入戰鬥 (1V1)</button>
+            <button id="prep-back-btn" class="btn btn-secondary">返回房間大廳</button>
+        </div>
+    </div>
+    
     <!-- 武器改裝廠 -->
     <div id="workshop-screen" class="overlay-screen" style="display: none;">
         <div class="coin-display">💰 金幣: <span class="coin-amount">200</span></div>
@@ -340,6 +444,8 @@ let weaponMods = {
     smg:     { magLevel: 0, recoilLevel: 0, redDot: false, activeSkin: 'default' }
 };
 
+let currentRoomPassword = "";
+let isCustomMatch = false;    
 let scene, camera, renderer, soundCtrl;
 let currentMode = 'endless';
 
@@ -969,6 +1075,73 @@ function setupEventListeners() {
         switchWeapon(player.currentSlot === 0 ? 1 : 0);
     });
 
+    // === 自定義房間畫面與 1V1 對決邏輯 ===
+    const customRoomScreen = document.getElementById('custom-room-screen');
+    const customPrepScreen = document.getElementById('custom-prep-screen');
+    const createBox = document.getElementById('create-room-box');
+    const joinBox = document.getElementById('join-room-box');
+    const tabCreateBtn = document.getElementById('tab-create-btn');
+    const tabJoinBtn = document.getElementById('tab-join-btn');
+    const statusMsg = document.getElementById('room-status-msg');
+
+    let currentTab = 'create';
+
+    // 打開自定義房間選單
+    document.getElementById('to-custom-btn').addEventListener('click', () => {
+        document.getElementById('main-lobby').style.display = 'none';
+        customRoomScreen.style.display = 'flex';
+        statusMsg.innerText = '';
+    });
+
+    // 返回大廳
+    document.getElementById('custom-back-btn').addEventListener('click', () => {
+        customRoomScreen.style.display = 'none';
+        document.getElementById('main-lobby').style.display = 'flex';
+    });
+
+    // 切換 創建 / 加入 分頁
+    tabCreateBtn.addEventListener('click', () => {
+        currentTab = 'create';
+        tabCreateBtn.classList.add('active');
+        tabJoinBtn.classList.remove('active');
+        createBox.style.display = 'block';
+        joinBox.style.display = 'none';
+        statusMsg.innerText = '';
+    });
+
+    tabJoinBtn.addEventListener('click', () => {
+        currentTab = 'join';
+        tabJoinBtn.classList.add('active');
+        tabCreateBtn.classList.remove('active');
+        joinBox.style.display = 'block';
+        createBox.style.display = 'none';
+        statusMsg.innerText = '';
+    });
+
+    // 確認密碼並進入戰術整備
+    document.getElementById('confirm-room-btn').addEventListener('click', () => {
+        if (currentTab === 'create') {
+            currentRoomPassword = document.getElementById('create-password-input').value;
+            openCustomPrepScreen();
+        } else {
+            const inputPass = document.getElementById('join-password-input').value;
+            if (currentRoomPassword !== "" && inputPass !== currentRoomPassword) {
+                statusMsg.innerText = '❌ 房間密碼錯誤！';
+                return;
+            }
+            openCustomPrepScreen();
+        }
+    });
+
+    // 戰術整備返回房間頁面
+    document.getElementById('prep-back-btn').addEventListener('click', () => {
+        customPrepScreen.style.display = 'none';
+        customRoomScreen.style.display = 'flex';
+    });
+
+    // 開始 1V1 對決按鈕
+    document.getElementById('start-1v1-btn').addEventListener('click', start1v1Match);
+    
     document.addEventListener('contextmenu', e => e.preventDefault());
 }
 
@@ -1514,6 +1687,86 @@ function animate() {
     }
     renderer.render(scene, camera);
 }
+
+// 初始化自定義戰術整備選單 (載入全武器基礎階級)
+function openCustomPrepScreen() {
+    document.getElementById('custom-room-screen').style.display = 'none';
+    document.getElementById('custom-prep-screen').style.display = 'flex';
+
+    const mainSelect = document.getElementById('custom-main-weapon');
+    const subSelect = document.getElementById('custom-sub-weapon');
+    mainSelect.innerHTML = '';
+    subSelect.innerHTML = '';
+
+    // 載入所有遊戲內武器供挑選 (無視解鎖狀態與配件)
+    Object.keys(WEAPON_CONFIGS).forEach(key => {
+        const opt1 = document.createElement('option');
+        opt1.value = key;
+        opt1.innerText = `${WEAPON_CONFIGS[key].name} [基礎階段]`;
+        mainSelect.appendChild(opt1);
+
+        const opt2 = document.createElement('option');
+        opt2.value = key;
+        opt2.innerText = `${WEAPON_CONFIGS[key].name} [基礎階段]`;
+        subSelect.appendChild(opt2);
+    });
+
+    subSelect.value = 'pistol'; // 預設副武器為手槍
+}
+
+// 啟動 1V1 單挑對決模式
+function start1v1Match() {
+    isCustomMatch = true;
+    currentMode = '1v1';
+
+    const mainType = document.getElementById('custom-main-weapon').value;
+    const subType = document.getElementById('custom-sub-weapon').value;
+
+    // 清空現有場景物件
+    weaponModels.forEach(m => camera.remove(m));
+    botEntities.forEach(b => scene.remove(b.mesh));
+    grenades.forEach(g => scene.remove(g.mesh));
+    dropItems.forEach(d => scene.remove(d.mesh));
+    shatterParticles.forEach(p => scene.remove(p.mesh));
+
+    botEntities = []; weaponModels = []; grenades = []; dropItems = []; shatterParticles = [];
+    activeBoss = null;
+
+    // 載入無配件改裝的「最基礎階段」武器數值
+    const getBaseWeapon = (t) => {
+        const cfg = WEAPON_CONFIGS[t];
+        return { type: t, ...cfg, ammo: cfg.ammoMax };
+    };
+
+    player.inventory = [getBaseWeapon(mainType), getBaseWeapon(subType)];
+    
+    // 建立 3D 槍枝模型 (不包含紅點與配件升級)
+    weaponModels.push(createWeaponMesh(mainType));
+    weaponModels.push(createWeaponMesh(subType));
+    scene.add(camera);
+
+    // 重設玩家狀態
+    player.hp = 100; player.kills = 0; player.earnedCoins = 0; player.lastHitTime = 0;
+    player.doubleDamageTimer = 0; player.magnetTimer = 0; player.recoilPitch = 0;
+    player.pos.set(0, 1.7, 15); player.vel.set(0, 0, 0);
+    player.currentSlot = 0;
+    switchWeapon(0);
+
+    // 生成單一玩家對手 (1V1 單挑對決)
+    spawnBot('對手玩家 (P2)', 'normal');
+
+    document.getElementById('mode-title').innerText = '1V1 密碼對決模式';
+    document.getElementById('custom-prep-screen').style.display = 'none';
+    document.getElementById('pause-screen').style.display = 'none';
+    document.getElementById('gameover-screen').style.display = 'none';
+    document.getElementById('boss-hud').style.display = 'none';
+    document.getElementById('hud').style.display = 'block';
+
+    isGameActive = true; isPaused = false;
+    document.body.requestPointerLock();
+    updateUI();
+}
+
 </script>
 </body>
 </html>
