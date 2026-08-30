@@ -1264,6 +1264,9 @@ function setupEventListeners() {
     
     document.addEventListener('contextmenu', e => e.preventDefault());
 
+    // === 跨平台多點觸控與視角控制系統 ===
+    const cameraTouches = new Map(); // 記錄所有可控制視角的觸控點 (ID -> {lastX, lastY})
+
     // 防止手機端默認滾動與雙擊放大動作
     document.addEventListener('touchstart', (e) => {
         if (e.target.classList.contains('touch-btn') || e.target.id === 'joystick-container') {
@@ -1271,10 +1274,10 @@ function setupEventListeners() {
         }
     }, { passive: false });
 
-    // === 1. 左下角搖桿邏輯 (負責移動) ===
+    // --- 1. 左下角搖桿邏輯 (移動) ---
     const joyContainer = document.getElementById('joystick-container');
     const joyKnob = document.getElementById('joystick-knob');
-    const joyRadius = 60; // 搖桿最大移動半徑
+    const joyRadius = 50;
 
     joyContainer.addEventListener('touchstart', (e) => {
         for (let touch of e.changedTouches) {
@@ -1284,42 +1287,6 @@ function setupEventListeners() {
             }
         }
     }, { passive: false });
-
-    window.addEventListener('touchmove', (e) => {
-        for (let touch of e.changedTouches) {
-            if (touch.identifier === touchState.joystickTouchId) {
-                updateJoystick(touch);
-            }
-            // 右半螢幕滑動瞄準邏輯
-            if (touch.identifier === touchState.aimTouchId) {
-                const deltaX = touch.clientX - lastAimTouchX;
-                const deltaY = touch.clientY - lastAimTouchY;
-                lastAimTouchX = touch.clientX;
-                lastAimTouchY = touch.clientY;
-
-                // 調整視角 (與滑鼠移動等效)
-                const sensitivity = 0.003;
-                camera.rotation.y -= deltaX * sensitivity;
-                player.recoilPitch = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, player.recoilPitch - deltaY * sensitivity));
-            }
-        }
-    }, { passive: false });
-
-    const resetJoystick = (e) => {
-        for (let touch of e.changedTouches) {
-            if (touch.identifier === touchState.joystickTouchId) {
-                touchState.joystickTouchId = null;
-                touchState.moveVector = { x: 0, y: 0 };
-                joyKnob.style.transform = `translate(0px, 0px)`;
-            }
-            if (touch.identifier === touchState.aimTouchId) {
-                touchState.aimTouchId = null;
-            }
-        }
-    };
-
-    window.addEventListener('touchend', resetJoystick);
-    window.addEventListener('touchcancel', resetJoystick);
 
     function updateJoystick(touch) {
         const rect = joyContainer.getBoundingClientRect();
@@ -1340,55 +1307,102 @@ function setupEventListeners() {
         touchState.moveVector.y = dy / joyRadius; // [-1, 1]
     }
 
-    // === 2. 右半螢幕拖拽瞄準監聽 ===
+    // --- 2. 全螢幕/按鈕 Universal 視角旋轉 (touchmove) ---
+    window.addEventListener('touchmove', (e) => {
+        for (let touch of e.changedTouches) {
+            // 搖桿點擊不參與視角旋轉
+            if (touch.identifier === touchState.joystickTouchId) {
+                updateJoystick(touch);
+                continue;
+            }
+
+            // 如果該觸控點有註冊視角旋轉
+            if (cameraTouches.has(touch.identifier)) {
+                const prev = cameraTouches.get(touch.identifier);
+                const deltaX = touch.clientX - prev.lastX;
+                const deltaY = touch.clientY - prev.lastY;
+
+                prev.lastX = touch.clientX;
+                prev.lastY = touch.clientY;
+
+                const sensitivity = 0.0035; // 觸控視角靈敏度
+
+                // 直接修改 player.rotation（關鍵修正：避免被 updatePlayer 蓋掉）
+                player.rotation.y -= deltaX * sensitivity;
+                player.rotation.x -= deltaY * sensitivity;
+
+                // 限制俯仰角度（防止畫面翻轉，範圍約 -80度 ~ 80度）
+                const maxPitch = Math.PI / 2.1;
+                player.rotation.x = Math.max(-maxPitch, Math.min(maxPitch, player.rotation.x));
+            }
+        }
+    }, { passive: false });
+
+    // 清理觸控結束狀態
+    const handleTouchEnd = (e) => {
+        for (let touch of e.changedTouches) {
+            if (touch.identifier === touchState.joystickTouchId) {
+                touchState.joystickTouchId = null;
+                touchState.moveVector = { x: 0, y: 0 };
+                joyKnob.style.transform = `translate(0px, 0px)`;
+            }
+            cameraTouches.delete(touch.identifier);
+        }
+    };
+    window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('touchcancel', handleTouchEnd);
+
+    // --- 3. 右半螢幕空白處滑動瞄準 ---
     window.addEventListener('touchstart', (e) => {
         for (let touch of e.changedTouches) {
-            // 只要點擊落在螢幕右半邊，且不是按鈕，即可滑動轉換視角
-            if (touch.clientX > window.innerWidth / 2 && touchState.aimTouchId === null) {
-                const target = e.target;
-                if (!target.classList.contains('touch-btn')) {
-                    touchState.aimTouchId = touch.identifier;
-                    lastAimTouchX = touch.clientX;
-                    lastAimTouchY = touch.clientY;
-                }
+            const target = touch.target;
+            // 避開搖桿與按鈕 (按鈕會有自己的 touchstart 註冊)
+            if (target.id === 'joystick-container' || target.id === 'joystick-knob' || target.classList.contains('touch-btn')) {
+                continue;
+            }
+            // 只要點擊螢幕右側半邊空白處，即可滑動視角
+            if (touch.clientX > window.innerWidth * 0.3) {
+                cameraTouches.set(touch.identifier, { lastX: touch.clientX, lastY: touch.clientY });
             }
         }
     });
 
-    // === 3. 左上角「開鏡瞄準」按鈕 ===
+    // --- 4. 左上角「開鏡按鈕」(允許邊按邊滑動瞄準) ---
     const aimBtn = document.getElementById('touch-aim-btn');
     aimBtn.addEventListener('touchstart', (e) => {
         e.preventDefault();
         touchState.isAimingBtn = true;
         aimBtn.classList.add('active');
+        for (let touch of e.changedTouches) {
+            cameraTouches.set(touch.identifier, { lastX: touch.clientX, lastY: touch.clientY });
+        }
     });
-    const releaseAim = (e) => {
+    aimBtn.addEventListener('touchend', () => {
         touchState.isAimingBtn = false;
         aimBtn.classList.remove('active');
-    };
-    aimBtn.addEventListener('touchend', releaseAim);
-    aimBtn.addEventListener('touchcancel', releaseAim);
+    });
 
-    // === 4. 右下角「開槍」按鈕 (包含直接開鏡+瞄準過程中射擊) ===
+    // --- 5. 右下角「開槍按鈕」(按下時可邊開槍邊滑動壓槍/瞄準) ---
     const shootBtn = document.getElementById('touch-shoot-btn');
     shootBtn.addEventListener('touchstart', (e) => {
         e.preventDefault();
         touchState.isShootBtn = true;
         shootBtn.classList.add('active');
-        triggerShoot(); // 觸發射擊邏輯
+        for (let touch of e.changedTouches) {
+            cameraTouches.set(touch.identifier, { lastX: touch.clientX, lastY: touch.clientY });
+        }
+        shoot(); // 立即觸發首發射擊
     });
-    const releaseShoot = (e) => {
+    shootBtn.addEventListener('touchend', () => {
         touchState.isShootBtn = false;
         shootBtn.classList.remove('active');
-    };
-    shootBtn.addEventListener('touchend', releaseShoot);
-    shootBtn.addEventListener('touchcancel', releaseShoot);
+    });
 
-    // === 5. 右側「手榴彈」按鈕 ===
+    // --- 6. 手榴彈按鈕 ---
     const grenadeBtn = document.getElementById('touch-grenade-btn');
     grenadeBtn.addEventListener('touchstart', (e) => {
         e.preventDefault();
-        throwGrenade(); // 呼叫現有投擲手榴彈函數
+        if (typeof throwGrenade === 'function') throwGrenade();
     });
 }
 
